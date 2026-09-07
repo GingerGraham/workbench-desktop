@@ -1,0 +1,25 @@
+# .dotfiles-sync.yml — workbench-desktop
+#
+# Ecosystem module (workbench-core ARCHITECTURE.md §2/§3): GUI desktop app
+# installers + Flatpak. Meaningless standalone — depends on
+# workbench-core's loader and Core API.
+#
+# See contracts/manifest-spec.md (in workbench-core) for the full field
+# reference.
+version: 1
+branch: main
+
+core_api: ">=1.1 <2.0"
+sync:
+  enabled: true
+
+register:
+  shell:
+    - src: shell/desktop.sh
+      tier: tools
+  installers:
+    - src: shell/installers.sh
+  getters:
+    - name: desktop
+      function: get-desktop-functions
+      label: "Desktop-app release listing helpers"
