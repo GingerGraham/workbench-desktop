@@ -6,8 +6,8 @@ All notable changes to `workbench-desktop` are documented here.
 
 ### Added
 
-- Added `installed-flatpak` — reports install status to `wb tools
-  upgrade`/`list --status` (workbench-core §12 D43).
+- Added `installed-flatpak` — reports install status to `wb tools upgrade`/
+  `list --status` (workbench-core §12 D43).
   `install-opendeck`/`install-opendeck-version`/`install-noteshub`/
   `install-noteshub-version` deliberately have no predicate — see PR
   description for why.
