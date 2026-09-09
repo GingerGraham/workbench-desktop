@@ -196,3 +196,7 @@ install-flatpak() {
     log_info "flatpak $(flatpak --version) ready with Flathub configured."
     log_info "A session restart may be required before installing apps."
 }
+
+installed-flatpak() {
+    command -v flatpak &>/dev/null
+}
