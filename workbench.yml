@@ -1,4 +1,4 @@
-# .dotfiles-sync.yml — workbench-desktop
+# workbench.yml — workbench-desktop
 #
 # Ecosystem module (workbench-core ARCHITECTURE.md §2/§3): GUI desktop app
 # installers + Flatpak. Meaningless standalone — depends on
@@ -6,12 +6,15 @@
 #
 # See contracts/manifest-spec.md (in workbench-core) for the full field
 # reference.
-version: 1
+version: 2
 branch: main
 
 core_api: ">=1.1 <2.0"
 sync:
   enabled: true
+
+info:
+  description: "GUI desktop app installers and Flatpak"
 
 register:
   shell:
