@@ -42,8 +42,16 @@ install-opendeck() {
 
     # Flathub build — signed by Flathub, published by upstream; preferred
     # over installing an unverified RPM/DEB as root (security review M3).
+    # Scope is explicit (--user, then --system) rather than left to flatpak's
+    # own default: with a "flathub" remote configured in both scopes,
+    # an unscoped `flatpak install` is ambiguous and fails/prompts instead
+    # of installing.
     if [[ "${WORKBENCH_OS}" == "Linux" ]] && command -v flatpak &>/dev/null; then
-        flatpak install -y flathub me.amankhanna.opendeck && return 0
+        if flatpak install -y --user flathub me.amankhanna.opendeck 2>/dev/null; then
+            return 0
+        elif flatpak install -y --system flathub me.amankhanna.opendeck; then
+            return 0
+        fi
         log_warn "Flathub install failed — falling back to the release package"
     fi
 
@@ -67,7 +75,9 @@ install-opendeck() {
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
             _wb_fetch_verified "${url}" "${temp_dir}/opendeck.deb" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
-            ${elevation_cmd} dpkg -i "${temp_dir}/opendeck.deb" || ${elevation_cmd} apt-get install -f -y
+            if ! { ${elevation_cmd} dpkg -i "${temp_dir}/opendeck.deb" || ${elevation_cmd} apt-get install -f -y; }; then
+                log_error "OpenDeck DEB install failed"; rm -rf "${temp_dir}"; return 1
+            fi
             ;;
         dnf|yum|zypper)
             local url; url="$(_gh_release_asset_url "${api_response}" '\.rpm$')"
@@ -76,9 +86,11 @@ install-opendeck() {
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
             _wb_fetch_verified "${url}" "${temp_dir}/opendeck.rpm" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
             if [[ "${PACKAGE_MANAGER}" == "zypper" ]]; then
-                ${elevation_cmd} zypper install -y "${temp_dir}/opendeck.rpm"
+                ${elevation_cmd} zypper install -y "${temp_dir}/opendeck.rpm" \
+                    || { log_error "OpenDeck RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             else
-                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/opendeck.rpm"
+                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/opendeck.rpm" \
+                    || { log_error "OpenDeck RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             fi
             ;;
         *)
@@ -124,7 +136,9 @@ install-noteshub() {
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
             _wb_fetch_verified "${url}" "${temp_dir}/noteshub.deb" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
-            ${elevation_cmd} dpkg -i "${temp_dir}/noteshub.deb" || ${elevation_cmd} apt-get install -f -y
+            if ! { ${elevation_cmd} dpkg -i "${temp_dir}/noteshub.deb" || ${elevation_cmd} apt-get install -f -y; }; then
+                log_error "NotesHub DEB install failed"; rm -rf "${temp_dir}"; return 1
+            fi
             ;;
         dnf|yum|zypper)
             [[ "${arch_suffix}" != "amd64" ]] && { log_error "RPM only for x86_64"; rm -rf "${temp_dir}"; return 1; }
@@ -134,9 +148,11 @@ install-noteshub() {
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
             _wb_fetch_verified "${url}" "${temp_dir}/noteshub.rpm" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
             if [[ "${PACKAGE_MANAGER}" == "zypper" ]]; then
-                ${elevation_cmd} zypper install -y "${temp_dir}/noteshub.rpm"
+                ${elevation_cmd} zypper install -y "${temp_dir}/noteshub.rpm" \
+                    || { log_error "NotesHub RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             else
-                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/noteshub.rpm"
+                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/noteshub.rpm" \
+                    || { log_error "NotesHub RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             fi
             ;;
         *)

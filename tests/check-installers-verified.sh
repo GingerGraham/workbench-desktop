@@ -42,9 +42,12 @@ _wb_fetch_verified() {
     return 0
 }
 _download_file_robust() { printf 'download_file_robust %s\n' "$1" >> "${CALL_LOG}"; : > "$2"; return 0; }
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
 dpkg()          { printf 'dpkg %s\n' "$*" >> "${CALL_LOG}"; return 0; }
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
 apt-get()       { printf 'apt-get %s\n' "$*" >> "${CALL_LOG}"; return 0; }
 zypper()        { printf 'zypper %s\n' "$*" >> "${CALL_LOG}"; return 0; }
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
 dnf()           { printf 'dnf %s\n' "$*" >> "${CALL_LOG}"; return 0; }
 yum()           { printf 'yum %s\n' "$*" >> "${CALL_LOG}"; return 0; }
 
@@ -119,31 +122,84 @@ else
 fi
 
 # ── OpenDeck: Flathub preferred when it's on PATH and the install succeeds ─
+# --user succeeds outright -- --system is never even tried.
 flatpak() { printf 'flatpak %s\n' "$*" >> "${CALL_LOG}"; return 0; }
 curl() { echo "FAIL: curl was called -- should have returned via Flathub" >&2; printf '%s' "${api_json_deb}"; }
 : > "${CALL_LOG}"
 if install-opendeck >/dev/null 2>&1 \
-    && grep -q '^flatpak install -y flathub me.amankhanna.opendeck$' "${CALL_LOG}" \
-    && ! grep -qE '^(dpkg|dnf|fetch_verified)' "${CALL_LOG}"; then
-    ok "install-opendeck: Flathub install succeeds and short-circuits the package-manager path"
+    && grep -q '^flatpak install -y --user flathub me.amankhanna.opendeck$' "${CALL_LOG}" \
+    && ! grep -qE '^(dpkg|dnf|fetch_verified|flatpak install -y --system)' "${CALL_LOG}"; then
+    ok "install-opendeck: Flathub --user install succeeds and short-circuits the package-manager path"
 else
     fail "install-opendeck: Flathub short-circuit did not behave as expected — got: $(cat "${CALL_LOG}" 2>/dev/null)"
 fi
 
-# Check: Flathub failure falls back to the package-manager path.
+# Check: --user fails (e.g. remote only configured system-wide), --system succeeds.
+flatpak() {
+    printf 'flatpak %s\n' "$*" >> "${CALL_LOG}"
+    [[ "$*" == *"--user"* ]] && return 1
+    return 0
+}
+: > "${CALL_LOG}"
+if install-opendeck >/dev/null 2>&1 \
+    && grep -q '^flatpak install -y --user' "${CALL_LOG}" \
+    && grep -q '^flatpak install -y --system flathub me.amankhanna.opendeck$' "${CALL_LOG}" \
+    && ! grep -qE '^(dpkg|dnf|fetch_verified)' "${CALL_LOG}"; then
+    ok "install-opendeck: --user failure falls through to --system, which succeeds"
+else
+    fail "install-opendeck: expected a --system fallback after --user failed — got: $(cat "${CALL_LOG}" 2>/dev/null)"
+fi
+
+# Check: both scopes fail (no flathub remote at all) -- falls back to the
+# verified package-manager path rather than giving up.
 flatpak() { printf 'flatpak %s\n' "$*" >> "${CALL_LOG}"; return 1; }
 : > "${CALL_LOG}"
 TEST_DIGEST="deadbeef"
 curl() { printf '%s' "${api_json_deb}"; }
 PACKAGE_MANAGER="apt"
 if install-opendeck >/dev/null 2>&1 \
-    && grep -q '^flatpak install' "${CALL_LOG}" \
+    && [[ "$(grep -c '^flatpak install' "${CALL_LOG}")" -eq 2 ]] \
     && grep -q '^dpkg' "${CALL_LOG}"; then
-    ok "install-opendeck: a failed Flathub install falls back to the verified package"
+    ok "install-opendeck: both Flathub scopes failing falls back to the verified package"
 else
-    fail "install-opendeck: expected a Flathub attempt then a package-manager fallback — got: $(cat "${CALL_LOG}" 2>/dev/null)"
+    fail "install-opendeck: expected two Flathub attempts then a package-manager fallback — got: $(cat "${CALL_LOG}" 2>/dev/null)"
 fi
 unset -f flatpak
+
+# ── OpenDeck: a package-manager install failure is not swallowed ──────────
+# (Copilot review finding: dpkg/apt-get and dnf/zypper failures used to fall
+# through to "installation complete" and a zero return.)
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+dpkg() { printf 'dpkg %s\n' "$*" >> "${CALL_LOG}"; return 1; }
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+apt-get() { printf 'apt-get %s\n' "$*" >> "${CALL_LOG}"; return 1; }
+: > "${CALL_LOG}"
+TEST_DIGEST="deadbeef"
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+curl() { printf '%s' "${api_json_deb}"; }
+PACKAGE_MANAGER="apt"
+if install-opendeck >/dev/null 2>&1; then
+    fail "install-opendeck (apt): a failed dpkg AND apt-get -f unexpectedly reported success"
+else
+    ok "install-opendeck (apt): a failed dpkg/apt-get -f install returns non-zero"
+fi
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+dpkg() { printf 'dpkg %s\n' "$*" >> "${CALL_LOG}"; return 0; }
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+apt-get() { printf 'apt-get %s\n' "$*" >> "${CALL_LOG}"; return 0; }
+
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+dnf() { printf 'dnf %s\n' "$*" >> "${CALL_LOG}"; return 1; }
+: > "${CALL_LOG}"
+TEST_DIGEST="cafef00d"
+curl() { printf '%s' "${api_json_rpm}"; }
+PACKAGE_MANAGER="dnf"
+if install-opendeck >/dev/null 2>&1; then
+    fail "install-opendeck (dnf): a failed dnf install unexpectedly reported success"
+else
+    ok "install-opendeck (dnf): a failed dnf install returns non-zero"
+fi
+dnf() { printf 'dnf %s\n' "$*" >> "${CALL_LOG}"; return 0; }
 
 # ── NotesHub: no Flathub listing (per the brief), verified-package path only ─
 WORKBENCH_ARCH="x86_64"
@@ -174,6 +230,22 @@ if install-noteshub >/dev/null 2>&1 \
 else
     fail "install-noteshub (apt, digest present): expected fetch_verified then dpkg — got: $(cat "${CALL_LOG}" 2>/dev/null)"
 fi
+
+# Check: a package-manager install failure is not swallowed (same Copilot
+# review finding, flagged separately for install-noteshub's apt branch).
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+dpkg() { printf 'dpkg %s\n' "$*" >> "${CALL_LOG}"; return 1; }
+# shellcheck disable=SC2317 # invoked indirectly by the sourced install-opendeck/install-noteshub
+apt-get() { printf 'apt-get %s\n' "$*" >> "${CALL_LOG}"; return 1; }
+: > "${CALL_LOG}"
+TEST_DIGEST="noteshubdeb"
+if install-noteshub >/dev/null 2>&1; then
+    fail "install-noteshub (apt): a failed dpkg/apt-get -f install unexpectedly reported success"
+else
+    ok "install-noteshub (apt): a failed dpkg/apt-get -f install returns non-zero"
+fi
+dpkg() { printf 'dpkg %s\n' "$*" >> "${CALL_LOG}"; return 0; }
+apt-get() { printf 'apt-get %s\n' "$*" >> "${CALL_LOG}"; return 0; }
 
 # ── curl's API query fails closed instead of proceeding with empty JSON ────
 curl() { return 22; }
