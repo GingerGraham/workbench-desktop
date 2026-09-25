@@ -4,6 +4,8 @@ All notable changes to `workbench-desktop` are documented here.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-25
+
 ### Security
 
 - **OpenDeck and NotesHub installers no longer install unverified
