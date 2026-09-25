@@ -46,7 +46,7 @@ install-opendeck() {
     # own default: with a "flathub" remote configured in both scopes,
     # an unscoped `flatpak install` is ambiguous and fails/prompts instead
     # of installing.
-    if [[ "${WORKBENCH_OS}" == "Linux" ]] && command -v flatpak &>/dev/null; then
+    if [[ "${WORKBENCH_OS:-}" == "Linux" ]] && command -v flatpak &>/dev/null; then
         if flatpak install -y --user flathub me.amankhanna.opendeck 2>/dev/null; then
             return 0
         elif flatpak install -y --system flathub me.amankhanna.opendeck; then
@@ -59,7 +59,7 @@ install-opendeck() {
 
     local api_response ver elevation_cmd="" temp_dir
     api_response="$(curl -fsS https://api.github.com/repos/nekename/OpenDeck/releases/latest)" \
-        || { log_error "Could not query the latest OpenDeck release (network or GitHub API rate limit)"; return 1; }
+        || { log_error "Could not query the latest OpenDeck release (curl failed — network, TLS, or a non-2xx response)"; return 1; }
     ver="$(echo "${api_response}" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
     [[ -z "${ver}" ]] && { log_error "Could not determine OpenDeck version"; return 1; }
 
@@ -116,7 +116,7 @@ install-noteshub() {
 
     local api_response ver arch_suffix elevation_cmd="" temp_dir
     api_response="$(curl -fsS https://api.github.com/repos/NotesHubApp/noteshub-releases/releases/latest)" \
-        || { log_error "Could not query the latest NotesHub release (network or GitHub API rate limit)"; return 1; }
+        || { log_error "Could not query the latest NotesHub release (curl failed — network, TLS, or a non-2xx response)"; return 1; }
     ver="$(echo "${api_response}" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
     [[ -z "${ver}" ]] && { log_error "Could not determine NotesHub version"; return 1; }
 
