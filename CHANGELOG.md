@@ -4,6 +4,20 @@ All notable changes to `workbench-desktop` are documented here.
 
 ## [Unreleased]
 
+### Security
+
+- **OpenDeck and NotesHub installers no longer install unverified
+  packages as root.** `install-opendeck` now prefers the verified Flathub
+  build (`me.amankhanna.opendeck`, published by upstream) when `flatpak`
+  is available, falling back to the release RPM/DEB only if that fails.
+  Both `install-opendeck` and `install-noteshub` now verify every
+  downloaded RPM/DEB against the SHA-256 GitHub publishes for it
+  (`_wb_fetch_verified`/`_wb_gh_asset_digest`, workbench-core Core API
+  1.4) before installing, and refuse to install a package with no
+  published digest rather than silently falling back to an unverified
+  download. NotesHub has no Flathub listing, so only the digest
+  verification applies there. See security review M3.
+
 ## [0.3.0] - 2026-09-23
 
 ### Added

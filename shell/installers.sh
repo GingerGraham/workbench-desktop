@@ -39,10 +39,27 @@ _gh_release_asset_url() {
 # ── OpenDeck install ──────────────────────────────────────────────────────────
 install-opendeck() {
     log_info "Installing or updating OpenDeck..."
+
+    # Flathub build — signed by Flathub, published by upstream; preferred
+    # over installing an unverified RPM/DEB as root (security review M3).
+    # Scope is explicit (--user, then --system) rather than left to flatpak's
+    # own default: with a "flathub" remote configured in both scopes,
+    # an unscoped `flatpak install` is ambiguous and fails/prompts instead
+    # of installing.
+    if [[ "${WORKBENCH_OS:-}" == "Linux" ]] && command -v flatpak &>/dev/null; then
+        if flatpak install -y --user flathub me.amankhanna.opendeck 2>/dev/null; then
+            return 0
+        elif flatpak install -y --system flathub me.amankhanna.opendeck; then
+            return 0
+        fi
+        log_warn "Flathub install failed — falling back to the release package"
+    fi
+
     [[ -z "${PACKAGE_MANAGER:-}" ]] && { detect-package-manager || return 1; }
 
     local api_response ver elevation_cmd="" temp_dir
-    api_response="$(curl -s https://api.github.com/repos/nekename/OpenDeck/releases/latest)"
+    api_response="$(curl -fsS https://api.github.com/repos/nekename/OpenDeck/releases/latest)" \
+        || { log_error "Could not query the latest OpenDeck release (curl failed — network, TLS, or a non-2xx response)"; return 1; }
     ver="$(echo "${api_response}" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
     [[ -z "${ver}" ]] && { log_error "Could not determine OpenDeck version"; return 1; }
 
@@ -55,17 +72,25 @@ install-opendeck() {
         apt)
             local url; url="$(_gh_release_asset_url "${api_response}" '\.deb$')"
             [[ -z "${url}" ]] && { log_error "No DEB asset found"; rm -rf "${temp_dir}"; return 1; }
-            _download_file_robust "${url}" "${temp_dir}/opendeck.deb" || { rm -rf "${temp_dir}"; return 1; }
-            ${elevation_cmd} dpkg -i "${temp_dir}/opendeck.deb" || ${elevation_cmd} apt-get install -f -y
+            local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
+            [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
+            _wb_fetch_verified "${url}" "${temp_dir}/opendeck.deb" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
+            if ! { ${elevation_cmd} dpkg -i "${temp_dir}/opendeck.deb" || ${elevation_cmd} apt-get install -f -y; }; then
+                log_error "OpenDeck DEB install failed"; rm -rf "${temp_dir}"; return 1
+            fi
             ;;
         dnf|yum|zypper)
             local url; url="$(_gh_release_asset_url "${api_response}" '\.rpm$')"
             [[ -z "${url}" ]] && { log_error "No RPM asset found"; rm -rf "${temp_dir}"; return 1; }
-            _download_file_robust "${url}" "${temp_dir}/opendeck.rpm" || { rm -rf "${temp_dir}"; return 1; }
+            local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
+            [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
+            _wb_fetch_verified "${url}" "${temp_dir}/opendeck.rpm" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
             if [[ "${PACKAGE_MANAGER}" == "zypper" ]]; then
-                ${elevation_cmd} zypper install -y "${temp_dir}/opendeck.rpm"
+                ${elevation_cmd} zypper install -y "${temp_dir}/opendeck.rpm" \
+                    || { log_error "OpenDeck RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             else
-                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/opendeck.rpm"
+                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/opendeck.rpm" \
+                    || { log_error "OpenDeck RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             fi
             ;;
         *)
@@ -90,7 +115,8 @@ install-noteshub() {
     [[ -z "${PACKAGE_MANAGER:-}" ]] && { detect-package-manager || return 1; }
 
     local api_response ver arch_suffix elevation_cmd="" temp_dir
-    api_response="$(curl -s https://api.github.com/repos/NotesHubApp/noteshub-releases/releases/latest)"
+    api_response="$(curl -fsS https://api.github.com/repos/NotesHubApp/noteshub-releases/releases/latest)" \
+        || { log_error "Could not query the latest NotesHub release (curl failed — network, TLS, or a non-2xx response)"; return 1; }
     ver="$(echo "${api_response}" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
     [[ -z "${ver}" ]] && { log_error "Could not determine NotesHub version"; return 1; }
 
@@ -107,18 +133,26 @@ install-noteshub() {
         apt)
             local url; url="$(_gh_release_asset_url "${api_response}" "noteshub_.*_${arch_suffix}\.deb")"
             [[ -z "${url}" ]] && { log_error "No DEB asset"; rm -rf "${temp_dir}"; return 1; }
-            _download_file_robust "${url}" "${temp_dir}/noteshub.deb" || { rm -rf "${temp_dir}"; return 1; }
-            ${elevation_cmd} dpkg -i "${temp_dir}/noteshub.deb" || ${elevation_cmd} apt-get install -f -y
+            local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
+            [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
+            _wb_fetch_verified "${url}" "${temp_dir}/noteshub.deb" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
+            if ! { ${elevation_cmd} dpkg -i "${temp_dir}/noteshub.deb" || ${elevation_cmd} apt-get install -f -y; }; then
+                log_error "NotesHub DEB install failed"; rm -rf "${temp_dir}"; return 1
+            fi
             ;;
         dnf|yum|zypper)
             [[ "${arch_suffix}" != "amd64" ]] && { log_error "RPM only for x86_64"; rm -rf "${temp_dir}"; return 1; }
             local url; url="$(_gh_release_asset_url "${api_response}" "NotesHub-.*\.x86_64\.rpm")"
             [[ -z "${url}" ]] && { log_error "No RPM asset"; rm -rf "${temp_dir}"; return 1; }
-            _download_file_robust "${url}" "${temp_dir}/noteshub.rpm" || { rm -rf "${temp_dir}"; return 1; }
+            local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
+            [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
+            _wb_fetch_verified "${url}" "${temp_dir}/noteshub.rpm" "${digest}" || { rm -rf "${temp_dir}"; return 1; }
             if [[ "${PACKAGE_MANAGER}" == "zypper" ]]; then
-                ${elevation_cmd} zypper install -y "${temp_dir}/noteshub.rpm"
+                ${elevation_cmd} zypper install -y "${temp_dir}/noteshub.rpm" \
+                    || { log_error "NotesHub RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             else
-                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/noteshub.rpm"
+                ${elevation_cmd} "${PACKAGE_MANAGER}" install -y "${temp_dir}/noteshub.rpm" \
+                    || { log_error "NotesHub RPM install failed"; rm -rf "${temp_dir}"; return 1; }
             fi
             ;;
         *)
