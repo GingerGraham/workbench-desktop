@@ -37,7 +37,7 @@ _wb_gh_asset_digest() { printf '%s\n' "${TEST_DIGEST:-}"; }
 # Records every call so a refused install can be told apart from a real one.
 CALL_LOG="${WORK}/calls"
 _wb_fetch_verified() {
-    printf 'fetch_verified %s %s %s\n' "$1" "$3" "${4:-}" >> "${CALL_LOG}"
+    printf 'fetch_verified %s %s\n' "$1" "$3" >> "${CALL_LOG}"
     : > "$2"
     return 0
 }
