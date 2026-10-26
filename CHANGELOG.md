@@ -28,9 +28,8 @@ All notable changes to `workbench-desktop` are documented here.
   `installed-opendeck` is true when the Flatpak `me.amankhanna.opendeck`
   is installed (user or system) or the `opendeck` binary is on `PATH`
   (the release RPM/DEB installs it), so `wb tools upgrade opendeck`
-  works. New `installed-noteshub` checks the `noteshub` DEB package; on RPM
-  hosts it reports "unknown", so `wb tools upgrade` skips NotesHub rather
-  than guess, until its RPM package name is confirmed.
+  works. New `installed-noteshub` checks the `NotesHub` RPM or `noteshub`
+  DEB package, names read from the packages' own metadata.
 
 ### Removed
 

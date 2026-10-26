@@ -77,7 +77,14 @@ expect 1 "$(run_pred "${d}" installed-opendeck)" "installed-opendeck: no Flatpak
 
 # ── installed-noteshub ───────────────────────────────────────────────────────
 d="${WORK}/nh-rpm"; stub "${d}" rpm 0
-expect 2 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: rpm host, package name unconfirmed -> can't tell"
+expect 0 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: rpm host, NotesHub package installed"
+
+d="${WORK}/nh-rpm-no"; stub "${d}" rpm 1
+expect 1 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: rpm host, NotesHub package not installed"
+
+# A name that isn't confirmed (empty) still means "can't tell", never a guess.
+d="${WORK}/nh-rpm-unset"; stub "${d}" rpm 0
+expect 2 "$(run_pred "${d}" installed-noteshub _NOTESHUB_RPM_NAME=)" "installed-noteshub: rpm host, package name unset -> can't tell"
 
 d="${WORK}/nh-dpkg"; stub "${d}" dpkg 0 "Status: install ok installed"
 expect 0 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: dpkg host, noteshub package installed"

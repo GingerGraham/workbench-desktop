@@ -18,11 +18,9 @@ wb add desktop
   update an app you already have. There is no version pin.
 - `wb tools list --status` and `wb tools upgrade` see OpenDeck as
   installed when its Flatpak (user or system) is installed or the
-  `opendeck` binary is on `PATH`, or its `opendeck` DEB package is
-  installed. NotesHub is seen as installed from its `noteshub` DEB package.
-  On RPM hosts NotesHub's status shows as unknown, so `wb tools upgrade`
-  skips it: its RPM package name isn't confirmed yet. Run
-  `wb tools install noteshub` to update it there.
+  `opendeck` binary is on `PATH`, or its `opendeck` RPM/DEB package is
+  installed. NotesHub is seen as installed from its `NotesHub` RPM or
+  `noteshub` DEB package.
 
 `install-flatpak` is grouped here rather than `workbench-devtools`:
 Flatpak exists specifically to distribute GUI applications, so it belongs

@@ -35,12 +35,12 @@ _OPENDECK_BIN="opendeck"
 
 # RPM/DEB package names, as each package's own metadata states them
 # (rpm -qp --qf '%{NAME}' <rpm>, dpkg-deb -f <deb> Package). Empty means not
-# confirmed yet: no name is guessed from an asset's file name. The DEB names
-# were read from the packages' control files on 2026-10-26 (OpenDeck 2.14.2,
-# NotesHub 3.9.0).
-_OPENDECK_RPM_NAME=""
+# confirmed yet: no name is guessed from an asset's file name. Read on
+# 2026-10-26 from the DEB control files (OpenDeck 2.14.2, NotesHub 3.9.0)
+# and the RPM headers' NAME tag (OpenDeck 2.14.2, NotesHub 3.13.0).
+_OPENDECK_RPM_NAME="opendeck"
 _OPENDECK_DEB_NAME="opendeck"
-_NOTESHUB_RPM_NAME=""
+_NOTESHUB_RPM_NAME="NotesHub"
 _NOTESHUB_DEB_NAME="noteshub"
 
 # _desktop_pkg_installed <rpm-name> <deb-name>
