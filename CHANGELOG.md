@@ -4,6 +4,23 @@ All notable changes to `workbench-desktop` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`get-desktop-functions` lists the module's names in zsh.** The
+  hand-written getter used `BASH_SOURCE` inside a function, which zsh
+  doesn't set, so in zsh it printed `(none)`. It's gone; workbench-core
+  now generates the getter from the manifest (its `docs/decisions-log.md`
+  D89). Its header reads `Desktop-app release listing helpers —
+  functions:`, and `get-desktop-functions` no longer lists itself.
+- **README no longer points at the removed `wb tools update`.** It says
+  `wb tools install <name>` / `wb tools upgrade <name>`.
+
+### Changed
+
+- **`core_api` requirement raised to `>=1.8 <2.0`**, for core-generated
+  getters and core's `_wb_gh_release_asset_url` (`CORE_API_VERSION` 1.8,
+  D90), which replaces this module's own copy.
+
 ## [0.3.1] - 2026-09-25
 
 ### Security

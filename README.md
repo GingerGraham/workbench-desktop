@@ -16,7 +16,8 @@ wb add desktop
 - `install-opendeck`, `install-opendeck-version` (not yet implemented — use
   `install-opendeck` for latest), `install-noteshub`,
   `install-noteshub-version` (same caveat), `install-flatpak` — via
-  `wb tools update`.
+  `wb tools install <name>` (`wb tools upgrade <name>` to update an app
+  you already have).
 
 `install-flatpak` is grouped here rather than `workbench-devtools`:
 Flatpak exists specifically to distribute GUI applications, so it belongs
@@ -34,4 +35,4 @@ so that extra layer is dropped rather than ported.
 ## Requires
 
 Nothing at install time — each app is installed via its own
-`install-<name>` function (`wb tools update`).
+`install-<name>` function, run with `wb tools install <name>`.

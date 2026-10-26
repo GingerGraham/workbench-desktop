@@ -21,20 +21,10 @@
 #
 # WORKBENCH_OS/WORKBENCH_DISTRO/WORKBENCH_ARCH are workbench-core Core API
 # platform facts (contracts/core-api.md), replacing the precursor's
-# DOTFILES_OS/DOTFILES_DISTRO. _download_file_robust/_gh_release_asset_url*
-# — *_gh_release_asset_url is duplicated locally below (small enough that
-# per-module duplication is the accepted norm here — see workbench-git's
-# own copy and ARCHITECTURE.md §12 D34 for the bar actually applied to
-# promote a helper to Core API instead).
-
-_gh_release_asset_url() {
-    local api_response="$1" pattern="$2"
-    printf '%s' "${api_response}" \
-        | grep -Eo '"browser_download_url": *"[^"]+"' \
-        | sed -E 's/.*"(https[^"]+)"/\1/' \
-        | grep -E "${pattern}" \
-        | head -1
-}
+# DOTFILES_OS/DOTFILES_DISTRO. _wb_gh_release_asset_url, _wb_gh_asset_digest
+# and _wb_fetch_verified are Core API (lib/core/installers-common.sh;
+# _wb_gh_release_asset_url replaced this file's own copy in Core API 1.8,
+# workbench-core docs/decisions-log.md D90).
 
 # ── OpenDeck install ──────────────────────────────────────────────────────────
 install-opendeck() {
@@ -70,7 +60,7 @@ install-opendeck() {
 
     case "${PACKAGE_MANAGER}" in
         apt)
-            local url; url="$(_gh_release_asset_url "${api_response}" '\.deb$')"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" '\.deb$')"
             [[ -z "${url}" ]] && { log_error "No DEB asset found"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -80,7 +70,7 @@ install-opendeck() {
             fi
             ;;
         dnf|yum|zypper)
-            local url; url="$(_gh_release_asset_url "${api_response}" '\.rpm$')"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" '\.rpm$')"
             [[ -z "${url}" ]] && { log_error "No RPM asset found"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -131,7 +121,7 @@ install-noteshub() {
 
     case "${PACKAGE_MANAGER}" in
         apt)
-            local url; url="$(_gh_release_asset_url "${api_response}" "noteshub_.*_${arch_suffix}\.deb")"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "noteshub_.*_${arch_suffix}\.deb")"
             [[ -z "${url}" ]] && { log_error "No DEB asset"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -142,7 +132,7 @@ install-noteshub() {
             ;;
         dnf|yum|zypper)
             [[ "${arch_suffix}" != "amd64" ]] && { log_error "RPM only for x86_64"; rm -rf "${temp_dir}"; return 1; }
-            local url; url="$(_gh_release_asset_url "${api_response}" "NotesHub-.*\.x86_64\.rpm")"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "NotesHub-.*\.x86_64\.rpm")"
             [[ -z "${url}" ]] && { log_error "No RPM asset"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }

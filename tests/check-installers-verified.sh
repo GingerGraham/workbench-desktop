@@ -34,6 +34,16 @@ get-elevation-command()  { printf '%s\n' ""; }
 # simulates a release asset with no published SHA-256 ("digest": null).
 _wb_gh_asset_digest() { printf '%s\n' "${TEST_DIGEST:-}"; }
 
+# Same body as core's _wb_gh_release_asset_url (installers-common.sh, D90):
+# the first browser_download_url matching the ERE.
+_wb_gh_release_asset_url() {
+    printf '%s' "$1" \
+        | grep -Eo '"browser_download_url": *"[^"]+"' \
+        | sed -E 's/.*"(https[^"]+)"/\1/' \
+        | grep -E "$2" \
+        | head -1
+}
+
 # Records every call so a refused install can be told apart from a real one.
 CALL_LOG="${WORK}/calls"
 _wb_fetch_verified() {
