@@ -80,7 +80,10 @@ d="${WORK}/nh-rpm"; stub "${d}" rpm 0
 expect 2 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: rpm host, package name unconfirmed -> can't tell"
 
 d="${WORK}/nh-dpkg"; stub "${d}" dpkg 0 "Status: install ok installed"
-expect 2 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: dpkg host, package name unconfirmed -> can't tell"
+expect 0 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: dpkg host, noteshub package installed"
+
+d="${WORK}/nh-dpkg-no"; stub "${d}" dpkg 1
+expect 1 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: dpkg host, noteshub package not installed"
 
 d="${WORK}/nh-none"; mkdir -p "${d}"
 expect 1 "$(run_pred "${d}" installed-noteshub)" "installed-noteshub: no rpm or dpkg (no route on this host)"

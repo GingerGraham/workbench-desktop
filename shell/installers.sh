@@ -35,11 +35,13 @@ _OPENDECK_BIN="opendeck"
 
 # RPM/DEB package names, as each package's own metadata states them
 # (rpm -qp --qf '%{NAME}' <rpm>, dpkg-deb -f <deb> Package). Empty means not
-# confirmed yet: no name is guessed from an asset's file name.
+# confirmed yet: no name is guessed from an asset's file name. The DEB names
+# were read from the packages' control files on 2026-10-26 (OpenDeck 2.14.2,
+# NotesHub 3.9.0).
 _OPENDECK_RPM_NAME=""
-_OPENDECK_DEB_NAME=""
+_OPENDECK_DEB_NAME="opendeck"
 _NOTESHUB_RPM_NAME=""
-_NOTESHUB_DEB_NAME=""
+_NOTESHUB_DEB_NAME="noteshub"
 
 # _desktop_pkg_installed <rpm-name> <deb-name>
 # 0: installed as an rpm or deb package. 1: not installed. 2: can't tell,
@@ -91,6 +93,16 @@ install-opendeck() {
     ver="$(echo "${api_response}" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
     [[ -z "${ver}" ]] && { log_error "Could not determine OpenDeck version"; return 1; }
 
+    # OpenDeck publishes a package per architecture (opendeck_<v>_amd64.deb,
+    # opendeck-<v>-1.x86_64.rpm, and the arm64/aarch64 pair). Match this
+    # host's: the first .deb/.rpm in the release can be the other one.
+    local deb_arch rpm_arch
+    case "${WORKBENCH_ARCH}" in
+        x86_64|amd64)  deb_arch="amd64"; rpm_arch="x86_64" ;;
+        aarch64|arm64) deb_arch="arm64"; rpm_arch="aarch64" ;;
+        *) log_error "OpenDeck: unsupported architecture ${WORKBENCH_ARCH}"; return 1 ;;
+    esac
+
     if [[ "${PACKAGE_MANAGER}" != "brew" ]]; then
         elevation_cmd="$(get-elevation-command)" || return 1
     fi
@@ -98,7 +110,7 @@ install-opendeck() {
 
     case "${PACKAGE_MANAGER}" in
         apt)
-            local url; url="$(_wb_gh_release_asset_url "${api_response}" '\.deb$')"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "_${deb_arch}\.deb$")"
             [[ -z "${url}" ]] && { log_error "No DEB asset found"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -108,7 +120,7 @@ install-opendeck() {
             fi
             ;;
         dnf|yum|zypper)
-            local url; url="$(_wb_gh_release_asset_url "${api_response}" '\.rpm$')"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "\.${rpm_arch}\.rpm$")"
             [[ -z "${url}" ]] && { log_error "No RPM asset found"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }

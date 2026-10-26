@@ -6,6 +6,10 @@ All notable changes to `workbench-desktop` are documented here.
 
 ### Fixed
 
+- **`wb tools install opendeck` installs this machine's architecture.** It
+  took the first `.rpm`/`.deb` in the release, and OpenDeck now publishes
+  both x86_64 and aarch64 packages, so an x86_64 host could be handed the
+  aarch64 one. It now matches `amd64`/`x86_64` or `arm64`/`aarch64`.
 - **`get-desktop-functions` lists the module's names in zsh.** The
   hand-written getter used `BASH_SOURCE` inside a function, which zsh
   doesn't set, so in zsh it printed `(none)`. It's gone; workbench-core
@@ -24,9 +28,9 @@ All notable changes to `workbench-desktop` are documented here.
   `installed-opendeck` is true when the Flatpak `me.amankhanna.opendeck`
   is installed (user or system) or the `opendeck` binary is on `PATH`
   (the release RPM/DEB installs it), so `wb tools upgrade opendeck`
-  works. New `installed-noteshub` reports "unknown" for now, so
-  `wb tools upgrade` skips NotesHub rather than guess: its RPM/DEB
-  package names aren't confirmed yet.
+  works. New `installed-noteshub` checks the `noteshub` DEB package; on RPM
+  hosts it reports "unknown", so `wb tools upgrade` skips NotesHub rather
+  than guess, until its RPM package name is confirmed.
 
 ### Removed
 
