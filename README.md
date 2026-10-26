@@ -13,11 +13,14 @@ wb add desktop
 ## What this gives you
 
 - `list-opendeck-releases`/`list-noteshub-releases` — interactive helpers.
-- `install-opendeck`, `install-opendeck-version` (not yet implemented — use
-  `install-opendeck` for latest), `install-noteshub`,
-  `install-noteshub-version` (same caveat), `install-flatpak` — via
-  `wb tools install <name>` (`wb tools upgrade <name>` to update an app
-  you already have).
+- Installers for `opendeck`, `noteshub` and `flatpak` — `wb tools install
+  <name>` to install the latest release, `wb tools upgrade <name>` to
+  update an app you already have. There is no version pin.
+- `wb tools list --status` and `wb tools upgrade` see OpenDeck as
+  installed when its Flatpak (user or system) is installed or the
+  `opendeck` binary is on `PATH`. NotesHub's status shows as unknown, so
+  `wb tools upgrade` skips it: its package names aren't confirmed yet.
+  Run `wb tools install noteshub` to update it.
 
 `install-flatpak` is grouped here rather than `workbench-devtools`:
 Flatpak exists specifically to distribute GUI applications, so it belongs

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shell/installers.sh — workbench-desktop
-# install-opendeck, install-opendeck-version, install-noteshub,
-# install-noteshub-version, install-flatpak. (list-opendeck-releases/
+# install-opendeck, install-noteshub, install-flatpak and their installed-*
+# predicates. (list-opendeck-releases/
 # list-noteshub-releases live in shell/desktop.sh instead — register.shell
 # content, not register.installers, since `wb tools` only sources this
 # file transiently to invoke one install-<name> function; those two are
@@ -25,6 +25,44 @@
 # and _wb_fetch_verified are Core API (lib/core/installers-common.sh;
 # _wb_gh_release_asset_url replaced this file's own copy in Core API 1.8,
 # workbench-core docs/decisions-log.md D90).
+
+# ── Install detection ─────────────────────────────────────────────────────────
+# OpenDeck's Flathub ID, and its binary name from upstream's own
+# src-tauri/tauri.conf.json ("mainBinaryName": "opendeck"); the release
+# RPM/DEB installs that binary as /usr/bin/opendeck.
+_OPENDECK_FLATPAK_ID="me.amankhanna.opendeck"
+_OPENDECK_BIN="opendeck"
+
+# RPM/DEB package names, as each package's own metadata states them
+# (rpm -qp --qf '%{NAME}' <rpm>, dpkg-deb -f <deb> Package). Empty means not
+# confirmed yet: no name is guessed from an asset's file name.
+_OPENDECK_RPM_NAME=""
+_OPENDECK_DEB_NAME=""
+_NOTESHUB_RPM_NAME=""
+_NOTESHUB_DEB_NAME=""
+
+# _desktop_pkg_installed <rpm-name> <deb-name>
+# 0: installed as an rpm or deb package. 1: not installed. 2: can't tell,
+# because a package name this host could have is unconfirmed (empty).
+_desktop_pkg_installed() {
+    local rpm_name="$1" deb_name="$2" unknown="false"
+    if command -v rpm &>/dev/null; then
+        if [[ -z "${rpm_name}" ]]; then
+            unknown="true"
+        elif rpm -q "${rpm_name}" &>/dev/null; then
+            return 0
+        fi
+    fi
+    if command -v dpkg &>/dev/null; then
+        if [[ -z "${deb_name}" ]]; then
+            unknown="true"
+        elif dpkg -s "${deb_name}" 2>/dev/null | grep -q '^Status: .* installed$'; then
+            return 0
+        fi
+    fi
+    [[ "${unknown}" == "true" ]] && return 2
+    return 1
+}
 
 # ── OpenDeck install ──────────────────────────────────────────────────────────
 install-opendeck() {
@@ -92,10 +130,17 @@ install-opendeck() {
     log_info "OpenDeck installation complete"
 }
 
-install-opendeck-version() {
-    local target="$1"
-    [[ -z "${target}" ]] && { log_error "Usage: install-opendeck-version <version>"; return 1; }
-    log_info "install-opendeck-version: use install-opendeck for latest; specific-version flow not yet implemented"
+# Installed by any of install-opendeck's routes: the Flatpak (user or
+# system), the release RPM/DEB, or the binary on PATH.
+installed-opendeck() {
+    if command -v flatpak &>/dev/null; then
+        flatpak info --user "${_OPENDECK_FLATPAK_ID}" &>/dev/null && return 0
+        flatpak info --system "${_OPENDECK_FLATPAK_ID}" &>/dev/null && return 0
+    fi
+    command -v "${_OPENDECK_BIN}" &>/dev/null && return 0
+    # The package installs the binary checked above, so "can't tell" (2)
+    # from an unconfirmed package name still means not installed here.
+    _desktop_pkg_installed "${_OPENDECK_RPM_NAME}" "${_OPENDECK_DEB_NAME}" && return 0
     return 1
 }
 
@@ -154,11 +199,11 @@ install-noteshub() {
     log_info "NotesHub installation complete"
 }
 
-install-noteshub-version() {
-    local target="$1"
-    [[ -z "${target}" ]] && { log_error "Usage: install-noteshub-version <version>"; return 1; }
-    log_info "install-noteshub-version: use install-noteshub for latest; specific-version flow not yet implemented"
-    return 1
+# install-noteshub's only route is the release RPM/DEB. Until their package
+# names are confirmed (above), this reports "can't tell" (2), which wb tools
+# treats as unresponsive: it never upgrades on a guess.
+installed-noteshub() {
+    _desktop_pkg_installed "${_NOTESHUB_RPM_NAME}" "${_NOTESHUB_DEB_NAME}"
 }
 
 # ── flatpak install ───────────────────────────────────────────────────────────

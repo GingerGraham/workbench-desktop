@@ -14,6 +14,27 @@ All notable changes to `workbench-desktop` are documented here.
   functions:`, and `get-desktop-functions` no longer lists itself.
 - **README no longer points at the removed `wb tools update`.** It says
   `wb tools install <name>` / `wb tools upgrade <name>`.
+- **`list-opendeck-releases` / `list-noteshub-releases` report a failed
+  request.** They use `curl -fsS`, so an HTTP error (a GitHub rate limit,
+  say) prints curl's error instead of an empty list.
+
+### Added
+
+- **`wb tools` can tell whether OpenDeck is installed.** New
+  `installed-opendeck` is true when the Flatpak `me.amankhanna.opendeck`
+  is installed (user or system) or the `opendeck` binary is on `PATH`
+  (the release RPM/DEB installs it), so `wb tools upgrade opendeck`
+  works. New `installed-noteshub` reports "unknown" for now, so
+  `wb tools upgrade` skips NotesHub rather than guess: its RPM/DEB
+  package names aren't confirmed yet.
+
+### Removed
+
+- **`install-opendeck-version` and `install-noteshub-version`.** They
+  were never implemented and always failed. Installers take no arguments
+  (workbench-core `docs/decisions-log.md` D102). Use
+  `wb tools install opendeck` / `wb tools install noteshub` for the
+  latest release.
 
 ### Changed
 
