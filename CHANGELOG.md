@@ -4,6 +4,47 @@ All notable changes to `workbench-desktop` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`wb tools install opendeck` installs this machine's architecture.** It
+  took the first `.rpm`/`.deb` in the release, and OpenDeck now publishes
+  both x86_64 and aarch64 packages, so an x86_64 host could be handed the
+  aarch64 one. It now matches `amd64`/`x86_64` or `arm64`/`aarch64`.
+- **`get-desktop-functions` lists the module's names in zsh.** The
+  hand-written getter used `BASH_SOURCE` inside a function, which zsh
+  doesn't set, so in zsh it printed `(none)`. It's gone; workbench-core
+  now generates the getter from the manifest (its `docs/decisions-log.md`
+  D89). Its header reads `Desktop-app release listing helpers —
+  functions:`, and `get-desktop-functions` no longer lists itself.
+- **README no longer points at the removed `wb tools update`.** It says
+  `wb tools install <name>` / `wb tools upgrade <name>`.
+- **`list-opendeck-releases` / `list-noteshub-releases` report a failed
+  request.** They use `curl -fsS`, so an HTTP error (a GitHub rate limit,
+  say) prints curl's error instead of an empty list.
+
+### Added
+
+- **`wb tools` can tell whether OpenDeck is installed.** New
+  `installed-opendeck` is true when the Flatpak `me.amankhanna.opendeck`
+  is installed (user or system) or the `opendeck` binary is on `PATH`
+  (the release RPM/DEB installs it), so `wb tools upgrade opendeck`
+  works. New `installed-noteshub` checks the `NotesHub` RPM or `noteshub`
+  DEB package, names read from the packages' own metadata.
+
+### Removed
+
+- **`install-opendeck-version` and `install-noteshub-version`.** They
+  were never implemented and always failed. Installers take no arguments
+  (workbench-core `docs/decisions-log.md` D102). Use
+  `wb tools install opendeck` / `wb tools install noteshub` for the
+  latest release.
+
+### Changed
+
+- **`core_api` requirement raised to `>=1.8 <2.0`**, for core-generated
+  getters and core's `_wb_gh_release_asset_url` (`CORE_API_VERSION` 1.8,
+  D90), which replaces this module's own copy.
+
 ## [0.3.1] - 2026-09-25
 
 ### Security

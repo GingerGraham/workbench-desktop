@@ -34,6 +34,16 @@ get-elevation-command()  { printf '%s\n' ""; }
 # simulates a release asset with no published SHA-256 ("digest": null).
 _wb_gh_asset_digest() { printf '%s\n' "${TEST_DIGEST:-}"; }
 
+# Same body as core's _wb_gh_release_asset_url (installers-common.sh, D90):
+# the first browser_download_url matching the ERE.
+_wb_gh_release_asset_url() {
+    printf '%s' "$1" \
+        | grep -Eo '"browser_download_url": *"[^"]+"' \
+        | sed -E 's/.*"(https[^"]+)"/\1/' \
+        | grep -E "$2" \
+        | head -1
+}
+
 # Records every call so a refused install can be told apart from a real one.
 CALL_LOG="${WORK}/calls"
 _wb_fetch_verified() {
@@ -57,9 +67,11 @@ source "${REPO_ROOT}/shell/installers.sh"
 # ── OpenDeck: no flatpak on PATH, forces the package-manager fallback ──────
 unset -f flatpak 2>/dev/null || true
 WORKBENCH_OS="Linux"
+WORKBENCH_ARCH="x86_64"
 PACKAGE_MANAGER="apt"
 
-api_json_deb='{"tag_name":"v1.0.0","assets":[{"digest":"sha256:deadbeef","browser_download_url":"https://example.invalid/opendeck.deb"}]}'
+# The other architecture's package comes first, as it can in a real release.
+api_json_deb='{"tag_name":"v1.0.0","assets":[{"digest":"sha256:deadbeef","browser_download_url":"https://example.invalid/opendeck_1.0.0_arm64.deb"},{"digest":"sha256:deadbeef","browser_download_url":"https://example.invalid/opendeck_1.0.0_amd64.deb"}]}'
 curl() { printf '%s' "${api_json_deb}"; }
 
 # Check 1: no published digest -- apt branch refuses, never calls dpkg.
@@ -80,7 +92,7 @@ fi
 : > "${CALL_LOG}"
 TEST_DIGEST="deadbeef"
 if install-opendeck >/dev/null 2>&1 \
-    && grep -q '^fetch_verified https://example.invalid/opendeck.deb deadbeef' "${CALL_LOG}" \
+    && grep -q '^fetch_verified https://example.invalid/opendeck_1.0.0_amd64.deb deadbeef' "${CALL_LOG}" \
     && grep -q '^dpkg' "${CALL_LOG}"; then
     ok "install-opendeck (apt, digest present): verified via _wb_fetch_verified, then installed"
 else
@@ -96,7 +108,7 @@ fi
 
 # Check 4: dnf branch — no digest refuses, never calls dnf/zypper.
 PACKAGE_MANAGER="dnf"
-api_json_rpm='{"tag_name":"v1.0.0","assets":[{"digest":"sha256:cafef00d","browser_download_url":"https://example.invalid/opendeck.rpm"}]}'
+api_json_rpm='{"tag_name":"v1.0.0","assets":[{"digest":"sha256:cafef00d","browser_download_url":"https://example.invalid/opendeck-1.0.0-1.aarch64.rpm"},{"digest":"sha256:cafef00d","browser_download_url":"https://example.invalid/opendeck-1.0.0-1.x86_64.rpm"}]}'
 curl() { printf '%s' "${api_json_rpm}"; }
 : > "${CALL_LOG}"
 TEST_DIGEST=""
@@ -114,12 +126,23 @@ fi
 : > "${CALL_LOG}"
 TEST_DIGEST="cafef00d"
 if install-opendeck >/dev/null 2>&1 \
-    && grep -q '^fetch_verified https://example.invalid/opendeck.rpm cafef00d' "${CALL_LOG}" \
+    && grep -q '^fetch_verified https://example.invalid/opendeck-1.0.0-1.x86_64.rpm cafef00d' "${CALL_LOG}" \
     && grep -q '^dnf' "${CALL_LOG}"; then
     ok "install-opendeck (dnf, digest present): verified via _wb_fetch_verified, then installed"
 else
     fail "install-opendeck (dnf, digest present): expected fetch_verified then dnf — got: $(cat "${CALL_LOG}" 2>/dev/null)"
 fi
+
+# Check 6: an aarch64 host gets the aarch64 package, not the first one.
+: > "${CALL_LOG}"
+WORKBENCH_ARCH="aarch64"
+if install-opendeck >/dev/null 2>&1 \
+    && grep -q '^fetch_verified https://example.invalid/opendeck-1.0.0-1.aarch64.rpm cafef00d' "${CALL_LOG}"; then
+    ok "install-opendeck (dnf, aarch64): picks the aarch64 package"
+else
+    fail "install-opendeck (dnf, aarch64): expected the aarch64 rpm — got: $(cat "${CALL_LOG}" 2>/dev/null)"
+fi
+WORKBENCH_ARCH="x86_64"
 
 # ── OpenDeck: Flathub preferred when it's on PATH and the install succeeds ─
 # --user succeeds outright -- --system is never even tried.

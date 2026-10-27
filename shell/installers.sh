@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shell/installers.sh — workbench-desktop
-# install-opendeck, install-opendeck-version, install-noteshub,
-# install-noteshub-version, install-flatpak. (list-opendeck-releases/
+# install-opendeck, install-noteshub, install-flatpak and their installed-*
+# predicates. (list-opendeck-releases/
 # list-noteshub-releases live in shell/desktop.sh instead — register.shell
 # content, not register.installers, since `wb tools` only sources this
 # file transiently to invoke one install-<name> function; those two are
@@ -21,19 +21,49 @@
 #
 # WORKBENCH_OS/WORKBENCH_DISTRO/WORKBENCH_ARCH are workbench-core Core API
 # platform facts (contracts/core-api.md), replacing the precursor's
-# DOTFILES_OS/DOTFILES_DISTRO. _download_file_robust/_gh_release_asset_url*
-# — *_gh_release_asset_url is duplicated locally below (small enough that
-# per-module duplication is the accepted norm here — see workbench-git's
-# own copy and ARCHITECTURE.md §12 D34 for the bar actually applied to
-# promote a helper to Core API instead).
+# DOTFILES_OS/DOTFILES_DISTRO. _wb_gh_release_asset_url, _wb_gh_asset_digest
+# and _wb_fetch_verified are Core API (lib/core/installers-common.sh;
+# _wb_gh_release_asset_url replaced this file's own copy in Core API 1.8,
+# workbench-core docs/decisions-log.md D90).
 
-_gh_release_asset_url() {
-    local api_response="$1" pattern="$2"
-    printf '%s' "${api_response}" \
-        | grep -Eo '"browser_download_url": *"[^"]+"' \
-        | sed -E 's/.*"(https[^"]+)"/\1/' \
-        | grep -E "${pattern}" \
-        | head -1
+# ── Install detection ─────────────────────────────────────────────────────────
+# OpenDeck's Flathub ID, and its binary name from upstream's own
+# src-tauri/tauri.conf.json ("mainBinaryName": "opendeck"); the release
+# RPM/DEB installs that binary as /usr/bin/opendeck.
+_OPENDECK_FLATPAK_ID="me.amankhanna.opendeck"
+_OPENDECK_BIN="opendeck"
+
+# RPM/DEB package names, as each package's own metadata states them
+# (rpm -qp --qf '%{NAME}' <rpm>, dpkg-deb -f <deb> Package). Empty means not
+# confirmed yet: no name is guessed from an asset's file name. Read on
+# 2026-10-26 from the DEB control files (OpenDeck 2.14.2, NotesHub 3.9.0)
+# and the RPM headers' NAME tag (OpenDeck 2.14.2, NotesHub 3.13.0).
+_OPENDECK_RPM_NAME="opendeck"
+_OPENDECK_DEB_NAME="opendeck"
+_NOTESHUB_RPM_NAME="NotesHub"
+_NOTESHUB_DEB_NAME="noteshub"
+
+# _desktop_pkg_installed <rpm-name> <deb-name>
+# 0: installed as an rpm or deb package. 1: not installed. 2: can't tell,
+# because a package name this host could have is unconfirmed (empty).
+_desktop_pkg_installed() {
+    local rpm_name="$1" deb_name="$2" unknown="false"
+    if command -v rpm &>/dev/null; then
+        if [[ -z "${rpm_name}" ]]; then
+            unknown="true"
+        elif rpm -q "${rpm_name}" &>/dev/null; then
+            return 0
+        fi
+    fi
+    if command -v dpkg &>/dev/null; then
+        if [[ -z "${deb_name}" ]]; then
+            unknown="true"
+        elif dpkg -s "${deb_name}" 2>/dev/null | grep -q '^Status: .* installed$'; then
+            return 0
+        fi
+    fi
+    [[ "${unknown}" == "true" ]] && return 2
+    return 1
 }
 
 # ── OpenDeck install ──────────────────────────────────────────────────────────
@@ -63,6 +93,16 @@ install-opendeck() {
     ver="$(echo "${api_response}" | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
     [[ -z "${ver}" ]] && { log_error "Could not determine OpenDeck version"; return 1; }
 
+    # OpenDeck publishes a package per architecture (opendeck_<v>_amd64.deb,
+    # opendeck-<v>-1.x86_64.rpm, and the arm64/aarch64 pair). Match this
+    # host's: the first .deb/.rpm in the release can be the other one.
+    local deb_arch rpm_arch
+    case "${WORKBENCH_ARCH}" in
+        x86_64|amd64)  deb_arch="amd64"; rpm_arch="x86_64" ;;
+        aarch64|arm64) deb_arch="arm64"; rpm_arch="aarch64" ;;
+        *) log_error "OpenDeck: unsupported architecture ${WORKBENCH_ARCH}"; return 1 ;;
+    esac
+
     if [[ "${PACKAGE_MANAGER}" != "brew" ]]; then
         elevation_cmd="$(get-elevation-command)" || return 1
     fi
@@ -70,7 +110,7 @@ install-opendeck() {
 
     case "${PACKAGE_MANAGER}" in
         apt)
-            local url; url="$(_gh_release_asset_url "${api_response}" '\.deb$')"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "_${deb_arch}\.deb$")"
             [[ -z "${url}" ]] && { log_error "No DEB asset found"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -80,7 +120,7 @@ install-opendeck() {
             fi
             ;;
         dnf|yum|zypper)
-            local url; url="$(_gh_release_asset_url "${api_response}" '\.rpm$')"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "\.${rpm_arch}\.rpm$")"
             [[ -z "${url}" ]] && { log_error "No RPM asset found"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -102,10 +142,17 @@ install-opendeck() {
     log_info "OpenDeck installation complete"
 }
 
-install-opendeck-version() {
-    local target="$1"
-    [[ -z "${target}" ]] && { log_error "Usage: install-opendeck-version <version>"; return 1; }
-    log_info "install-opendeck-version: use install-opendeck for latest; specific-version flow not yet implemented"
+# Installed by any of install-opendeck's routes: the Flatpak (user or
+# system), the release RPM/DEB, or the binary on PATH.
+installed-opendeck() {
+    if command -v flatpak &>/dev/null; then
+        flatpak info --user "${_OPENDECK_FLATPAK_ID}" &>/dev/null && return 0
+        flatpak info --system "${_OPENDECK_FLATPAK_ID}" &>/dev/null && return 0
+    fi
+    command -v "${_OPENDECK_BIN}" &>/dev/null && return 0
+    # The package installs the binary checked above, so "can't tell" (2)
+    # from an unconfirmed package name still means not installed here.
+    _desktop_pkg_installed "${_OPENDECK_RPM_NAME}" "${_OPENDECK_DEB_NAME}" && return 0
     return 1
 }
 
@@ -131,7 +178,7 @@ install-noteshub() {
 
     case "${PACKAGE_MANAGER}" in
         apt)
-            local url; url="$(_gh_release_asset_url "${api_response}" "noteshub_.*_${arch_suffix}\.deb")"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "noteshub_.*_${arch_suffix}\.deb")"
             [[ -z "${url}" ]] && { log_error "No DEB asset"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -142,7 +189,7 @@ install-noteshub() {
             ;;
         dnf|yum|zypper)
             [[ "${arch_suffix}" != "amd64" ]] && { log_error "RPM only for x86_64"; rm -rf "${temp_dir}"; return 1; }
-            local url; url="$(_gh_release_asset_url "${api_response}" "NotesHub-.*\.x86_64\.rpm")"
+            local url; url="$(_wb_gh_release_asset_url "${api_response}" "NotesHub-.*\.x86_64\.rpm")"
             [[ -z "${url}" ]] && { log_error "No RPM asset"; rm -rf "${temp_dir}"; return 1; }
             local digest; digest="$(_wb_gh_asset_digest "${api_response}" "${url}")"
             [[ -z "${digest}" ]] && { log_error "No published SHA-256 for ${url##*/} — refusing to install"; rm -rf "${temp_dir}"; return 1; }
@@ -164,11 +211,11 @@ install-noteshub() {
     log_info "NotesHub installation complete"
 }
 
-install-noteshub-version() {
-    local target="$1"
-    [[ -z "${target}" ]] && { log_error "Usage: install-noteshub-version <version>"; return 1; }
-    log_info "install-noteshub-version: use install-noteshub for latest; specific-version flow not yet implemented"
-    return 1
+# install-noteshub's only route is the release RPM/DEB. Until their package
+# names are confirmed (above), this reports "can't tell" (2), which wb tools
+# treats as unresponsive: it never upgrades on a guess.
+installed-noteshub() {
+    _desktop_pkg_installed "${_NOTESHUB_RPM_NAME}" "${_NOTESHUB_DEB_NAME}"
 }
 
 # ── flatpak install ───────────────────────────────────────────────────────────
