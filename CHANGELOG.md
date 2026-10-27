@@ -4,6 +4,8 @@ All notable changes to `workbench-desktop` are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
 ### Fixed
 
 - **`wb tools install opendeck` installs this machine's architecture.** It
